@@ -35,36 +35,50 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    const visaCollection = client.db("visaDB").collection("visa");
-    const reviewsCollection = client.db("visaDB").collection("review");
-    const applicationCollection = client
-    .db("visaDB")
-    .collection("visaApplications");
-    
+
     const usersPH = client.db("productHuntDB").collection("users");
     const productsPH = client.db("productHuntDB").collection("products");
 
 
 
-// Route to register  user
+
+// Route to register user or check existence
 app.post("/register", async (req, res) => {
   try {
     const { email, name, photo } = req.body;
 
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Check if user already exists
+    const existingUser = await usersPH.findOne({ email: email });
+
+    if (existingUser) {
+      // User already exists, return success with existing user details
+      return res.status(200).json({
+        message: "User already exists",
+        user: existingUser,
+      });
+    }
+
     // Create a new user object
     const newUser = {
       email: email,
-      name: name,
-      photo: photo,
-      role: "user",               // Default role
-      createdAt: new Date(),      // Registration time
+      name: name || "Unnamed User", // Default to "Unnamed User" if no name provided
+      photo: photo || null,
+      role: "user", // Default role
+      createdAt: new Date(), // Registration time
     };
 
     // Insert user into the collection
     const result = await usersPH.insertOne(newUser);
 
     if (result.insertedId) {
-      res.status(201).json({ message: "User registered successfully" });
+      res.status(201).json({
+        message: "User registered successfully",
+        user: newUser,
+      });
     } else {
       res.status(500).json({ message: "Failed to register user" });
     }
@@ -73,6 +87,83 @@ app.post("/register", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+//check if moderator 
+app.post("/api/check-role", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+      const user = await usersPH.findOne({ email });
+
+      if (user) {
+          res.status(200).json({ role: user.role });
+      } else {
+          res.status(404).json({ error: "User not found" });
+      }
+  } catch (error) {
+      console.error("Error checking user role:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+
+
+
+
+// Fetch products by status
+app.get("/api/products", async (req, res) => {
+  const { status } = req.query;
+
+  try {
+      // Query to filter by status if provided
+      const query = status ? { status } : {};
+
+      // Fetch products based on query
+      const products = await productsPH.find(query).toArray();
+
+      res.status(200).json(products);
+  } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+
+
+
+
+// Update product status (approve or reject)
+app.patch("/api/products/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.query;
+
+  if (!["approved", "rejected"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
+  }
+
+  try {
+      const result = await productsPH.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+      );
+
+      if (result.modifiedCount > 0) {
+          res.status(200).json({ message: `Product ${status} successfully` });
+      } else {
+          res.status(404).json({ error: "Product not found" });
+      }
+  } catch (error) {
+      console.error("Error updating product status:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 
 
@@ -129,6 +220,8 @@ app.get('/my-products', async (req, res) => {
   }
 });
 
+
+
 //get all products with pagination
 app.get('/products', async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Current page number
@@ -137,7 +230,7 @@ app.get('/products', async (req, res) => {
 
   try {
     const totalProducts = await productsPH.countDocuments(); // Total number of products
-    const products = await productsPH.find().skip(skip).limit(limit).toArray(); // Fetch paginated products
+    const products = await productsPH.find().sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(); // Fetch paginated products
 
     res.status(200).json({
       products,
