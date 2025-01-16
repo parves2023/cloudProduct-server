@@ -76,7 +76,7 @@ app.post("/register", async (req, res) => {
 
 
 
-// Add products
+// Add  products
 app.post("/products", async (req, res) => {
   try {
     const product = req.body;
