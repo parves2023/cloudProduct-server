@@ -46,7 +46,7 @@ async function run() {
 
 
 
-// Route to register user
+// Route to register  user
 app.post("/register", async (req, res) => {
   try {
     const { email, name, photo } = req.body;
