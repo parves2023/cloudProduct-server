@@ -168,27 +168,7 @@ app.patch("/api/products/:id", async (req, res) => {
 
 
 
-// Mark a product as featured
-// app.patch('/products/mark-as-featured/:id', async (req, res) => {
-//   const { id } = req.params;
 
-//   try {
-//     const result = await productsPH.updateOne(
-//       { _id: new ObjectId(id) }, // Match the product by ID
-//       { $set: { markAsFeatured: true } }, // Update or set the field
-//       { upsert: false } // Don't create a new document if it doesn't exist
-//     );
-
-//     if (result.modifiedCount > 0) {
-//       res.status(200).json({ success: true, message: 'Product marked as featured.' });
-//     } else {
-//       res.status(404).json({ success: false, message: 'Product not found.' });
-//     }
-//   } catch (error) {
-//     console.error("Error updating product:", error);
-//     res.status(500).json({ success: false, error: 'Failed to mark product as featured.' });
-//   }
-// });
 
 
 
@@ -272,6 +252,50 @@ app.post("/products", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+
+
+// add and remove like
+app.patch('/products/like/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userEmail, userName } = req.body;
+
+  try {
+    const product = await productsPH.findOne({ _id: new ObjectId(id) });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const hasLiked = product.likes?.some(like => like.email === userEmail);
+
+    if (hasLiked) {
+      // Remove like
+      await productsPH.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $pull: { likes: { email: userEmail } },
+          $inc: { likeCount: -1 },
+        }
+      );
+    } else {
+      // Add like
+      await productsPH.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $push: { likes: { email: userEmail, name: userName } },
+          $inc: { likeCount: 1 },
+        }
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error handling like:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 
 
@@ -411,141 +435,6 @@ app.get('/products', async (req, res) => {
 
 
 
-    //insert a visa
-    app.post("/add-visa", async (req, res) => {
-      const newVisa = req.body;
-      console.log("New visa:", newVisa);
-
-      const result = await visaCollection.insertOne(newVisa);
-      res.send(result);
-    });
-
-    // API Endpoint to Get All Visas with Optional Limit
-    app.get("/visas", async (req, res) => {
-      try {
-        const limit = parseInt(req.query.limit) || 0; // Default to 0 (no limit) if not provided
-        const visas = await visaCollection
-          .find()
-          .sort({ createdAt: -1 })
-          .limit(limit)
-          .toArray(); // Sort by createdAt, then apply limit
-        res.send(visas);
-      } catch (error) {
-        console.error("Failed to fetch visas:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
-
-    // fetching visas by authorEmail
-    app.get("/my-visas", async (req, res) => {
-      const email = req.query.email;
-      try {
-        const myVisas = await visaCollection
-          .find({ authorEmail: email })
-          .toArray();
-        res.send(myVisas);
-      } catch (error) {
-        console.error("Failed to fetch visas:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
-
-    // Update a visa by ID
-    app.put("/visas/:id", async (req, res) => {
-      const id = req.params.id;
-      const updatedVisa = req.body;
-
-      try {
-        const result = await visaCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: updatedVisa }
-        );
-
-        if (result.modifiedCount > 0) {
-          res.send({ message: "Visa updated successfully!" });
-        } else {
-          res
-            .status(404)
-            .send({ message: "Visa not found or no changes made." });
-        }
-      } catch (error) {
-        console.error("Error updating visa:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
-
-    // Delete a visa by ID
-    app.delete("/visas/:id", async (req, res) => {
-      const id = req.params.id; // Extract the visa ID from the route parameter
-
-      try {
-        const result = await visaCollection.deleteOne({
-          _id: new ObjectId(id),
-        }); // Match visa by ID
-
-        if (result.deletedCount > 0) {
-          res.send({ message: "Visa deleted successfully!" });
-        } else {
-          res.status(404).send({ message: "Visa not found." });
-        }
-      } catch (error) {
-        console.error("Error deleting visa:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
-
-   
-
-    // save visa application
-    app.post("/applications", async (req, res) => {
-      const application = req.body;
-
-      try {
-        const result = await applicationCollection.insertOne(application);
-        res.send(result);
-      } catch (error) {
-        console.error("Error saving application:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
-
-    // Fetch all applications for the logged-in user
-    app.get("/applications/:email", async (req, res) => {
-      const userEmail = req.params.email; // Extract email from the URL parameter
-
-      try {
-        const applications = await applicationCollection
-          .find({ email: userEmail })
-          .toArray();
-        res.send(applications);
-      } catch (error) {
-        console.error("Error fetching applications:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
-
-    // Delete application
-    app.delete("/applications/:id", async (req, res) => {
-      const applicationId = req.params.id;
-
-      try {
-        const applicationCollection = client
-          .db("visaDB")
-          .collection("visaApplications");
-        const result = await applicationCollection.deleteOne({
-          _id: new ObjectId(applicationId),
-        });
-
-        if (result.deletedCount === 1) {
-          res.send({ message: "Application canceled successfully" });
-        } else {
-          res.status(404).send({ message: "Application not found" });
-        }
-      } catch (error) {
-        console.error("Error deleting application:", error);
-        res.status(500).send({ message: "Server error" });
-      }
-    });
 
 
 
@@ -557,28 +446,6 @@ app.get('/products', async (req, res) => {
 
 
 
-// Get all reviews
-app.get('/reviews', async (req, res) => {
-  try {
-    const reviews = await reviewsCollection.find().toArray();
-    res.json(reviews);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error fetching reviews');
-  }
-});
-
-// Add a new review
-app.post('/reviews', async (req, res) => {
-  try {
-    const newReview = req.body;
-    const result = await reviewsCollection.insertOne(newReview);
-    res.json(result);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error adding review');
-  }
-});
 
 
 
