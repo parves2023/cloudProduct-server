@@ -167,6 +167,81 @@ app.patch("/api/products/:id", async (req, res) => {
 
 
 
+
+// Mark a product as featured
+// app.patch('/products/mark-as-featured/:id', async (req, res) => {
+//   const { id } = req.params;
+
+//   try {
+//     const result = await productsPH.updateOne(
+//       { _id: new ObjectId(id) }, // Match the product by ID
+//       { $set: { markAsFeatured: true } }, // Update or set the field
+//       { upsert: false } // Don't create a new document if it doesn't exist
+//     );
+
+//     if (result.modifiedCount > 0) {
+//       res.status(200).json({ success: true, message: 'Product marked as featured.' });
+//     } else {
+//       res.status(404).json({ success: false, message: 'Product not found.' });
+//     }
+//   } catch (error) {
+//     console.error("Error updating product:", error);
+//     res.status(500).json({ success: false, error: 'Failed to mark product as featured.' });
+//   }
+// });
+
+
+
+
+// Mark or unmark a product as featured
+app.patch('/products/mark-as-featured/:id', async (req, res) => {
+  const { id } = req.params;
+  const { markAsFeatured } = req.body;
+
+  try {
+    const result = await productsPH.updateOne(
+      { _id: new ObjectId(id) }, // Match the product by ID
+      { $set: { markAsFeatured } } // Update the `markAsFeatured` field
+    );
+
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ success: true, message: `Product ${markAsFeatured ? "marked as" : "unmarked as"} featured.` });
+    } else {
+      res.status(404).json({ success: false, message: "Product not found." });
+    }
+  } catch (error) {
+    console.error("Error updating product:", error);
+    res.status(500).json({ success: false, error: "Failed to update product featured status." });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Add  products
 app.post("/products", async (req, res) => {
   try {
@@ -202,7 +277,6 @@ app.post("/products", async (req, res) => {
 
 
 //get my products
-
 app.get('/my-products', async (req, res) => {
   try {
     const { email } = req.query; // Get email from query parameters
@@ -227,10 +301,12 @@ app.get('/products', async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Current page number
   const limit = parseInt(req.query.limit) || 6; // Items per page
   const skip = (page - 1) * limit; // Items to skip
+  const filter = { status: "approved" };
+
 
   try {
-    const totalProducts = await productsPH.countDocuments(); // Total number of products
-    const products = await productsPH.find().sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(); // Fetch paginated products
+    const totalProducts = await productsPH.countDocuments(filter); // Total number of products
+    const products = await productsPH.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(); // Fetch paginated products
 
     res.status(200).json({
       products,
