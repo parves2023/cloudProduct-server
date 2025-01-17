@@ -197,6 +197,99 @@ app.patch('/products/mark-as-featured/:id', async (req, res) => {
 
 
 
+//add report 
+app.patch('/products/report/:id', async (req, res) => {
+  const { id } = req.params;
+  const { reportedBy, reportDetails } = req.body;
+
+  if (!reportedBy || !reportDetails) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const result = await productsPH.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $push: {
+          reports: { reportedBy, reportDetails, reportedAt: new Date() },
+        },
+      },
+      { upsert: true }
+    );
+
+    if (result.modifiedCount > 0 || result.upsertedCount > 0) {
+      res.status(200).json({ message: 'Report added successfully' });
+    } else {
+      res.status(400).json({ error: 'Failed to report product' });
+    }
+  } catch (error) {
+    console.error('Error reporting product:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
+
+
+// Fetch reported posts
+app.get("/reported-posts", async (req, res) => {
+  try {
+    // Query to find products with non-empty `reports` array
+    const reportedPosts = await productsPH
+      .find({ reports: { $exists: true, $ne: [] } })
+      .toArray();
+
+    res.status(200).json(reportedPosts);
+  } catch (error) {
+    console.error("Error fetching reported posts:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+// delete post
+app.delete('/products/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await productsPH.deleteOne({ _id: new ObjectId(id) });
+    res.status(200).json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
+// delete report
+app.patch('/products/:id/delete-report', async (req, res) => {
+  const { id } = req.params;
+  const { reportIndex } = req.body;
+
+  try {
+    const result = await productsPH.updateOne(
+      { _id: new ObjectId(id) },
+      { $unset: { [`reports.${reportIndex}`]: 1 } }
+    );
+
+    // Clean up empty slots
+    await productsPH.updateOne(
+      { _id: new ObjectId(id) },
+      { $pull: { reports: null } }
+    );
+
+    res.status(200).json({ message: 'Report deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
+
 
 
 
