@@ -299,6 +299,61 @@ app.patch('/products/:id/delete-report', async (req, res) => {
 
 
 
+// Get users grouped by roles with MongoDB queries
+// Get users by role
+app.get("/users", async (req, res) => {
+  try {
+    const { role } = req.query;
+
+    
+
+    // Query based on the provided role
+    const query = role ? { role } : {};
+    const users = await usersPH.find(query).toArray();
+
+    
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+
+
+/// change user role
+app.patch("/users/:id", async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+
+  try {
+    const result = await usersPH.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { role } }
+    );
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ message: "Role updated successfully" });
+    } else {
+      res.status(404).json({ error: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
 
 
 
