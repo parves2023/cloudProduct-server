@@ -347,6 +347,20 @@ app.patch("/users/:id", async (req, res) => {
 
 
 
+// Backend route to get featured products
+app.get('/api/featured-products', async (req, res) => {
+  try {
+    const products = await productsPH.find({ featured: true }).toArray();
+    res.status(200).json(products);
+  } catch (error) {
+    console.error("Error fetching featured products:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+
 
 
 
