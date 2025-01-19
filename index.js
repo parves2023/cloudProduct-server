@@ -420,7 +420,7 @@ app.post("/products", async (req, res) => {
 // add and remove like
 app.patch('/products/like/:id', async (req, res) => {
   const { id } = req.params;
-  const { userEmail, userName } = req.body;
+  const { userEmail, userName, likeCount } = req.body;
 
   try {
     const product = await productsPH.findOne({ _id: new ObjectId(id) });
@@ -432,21 +432,21 @@ app.patch('/products/like/:id', async (req, res) => {
     const hasLiked = product.likes?.some(like => like.email === userEmail);
 
     if (hasLiked) {
-      // Remove like
+      // Remove like and update likeCount
       await productsPH.updateOne(
         { _id: new ObjectId(id) },
         {
           $pull: { likes: { email: userEmail } },
-          $inc: { likeCount: -1 },
+          $set: { likeCount: likeCount - 1 }, // Update likeCount with provided value
         }
       );
     } else {
-      // Add like
+      // Add like and update likeCount
       await productsPH.updateOne(
         { _id: new ObjectId(id) },
         {
           $push: { likes: { email: userEmail, name: userName } },
-          $inc: { likeCount: 1 },
+          $set: { likeCount: likeCount + 1 }, // Update likeCount with provided value
         }
       );
     }
@@ -457,6 +457,34 @@ app.patch('/products/like/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
+
+
+
+
+// Trending Products Route
+app.get('/products/trending', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 6; // Parse limit from query, default to 6
+
+    // Fetch products and sort them by the length of the 'likes' array in descending order
+    const products = await productsPH
+      .find({})
+      .sort({ "likeCount": -1 }) // Sort by the length of the 'likes' array in descending order
+      .limit(limit)
+      .toArray();
+
+    console.log(products);
+
+    res.status(200).json({ success: true, products });
+  } catch (error) {
+    console.error('Error fetching trending products:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+
 
 
 
