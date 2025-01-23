@@ -38,6 +38,7 @@ async function run() {
 
     const usersPH = client.db("productHuntDB").collection("users");
     const productsPH = client.db("productHuntDB").collection("products");
+    const reviewsPH = client.db("productHuntDB").collection("reviews");
 
 
 
@@ -550,6 +551,62 @@ app.get('/products', async (req, res) => {
     res.status(500).send({ message: "Server error" });
   }
 });
+
+
+
+app.post("/reviews", async (req, res) => {
+  console.log("hitting");
+  
+  const { productId, userEmail, userName, rating, review, createdAt, userImg } = req.body;
+
+  if (!productId || !userEmail || !userName || !rating || !review) {
+    return res.status(400).json({ success: false, message: "All fields are required." });
+  }
+
+  try {
+  
+    const result = await reviewsPH.insertOne({
+      productId,
+      userEmail,
+      userName,
+      userImg,
+      rating,
+      review,
+      createdAt,
+    });
+
+    res.status(201).json({ success: true, message: "Review submitted successfully!", result });
+  } catch (error) {
+    console.error("Error saving review:", error);
+    res.status(500).json({ success: false, message: "Failed to save review." });
+  }
+});
+
+
+
+
+
+
+// Get reviews by product ID
+app.get("/products/:id/reviews", async (req, res) => {
+  const productId = req.params.id;
+
+  try {
+    const reviews = await reviewsPH.find({ productId }).toArray(); // Fetch reviews matching the productId
+
+    if (reviews.length > 0) {
+      res.status(200).json({ success: true, reviews });
+    } else {
+      res.status(404).json({ success: false, message: "No reviews found for this product." });
+    }
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch reviews." });
+  }
+});
+
+
+
 
 
 
