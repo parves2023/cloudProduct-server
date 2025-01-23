@@ -511,27 +511,53 @@ app.get('/my-products', async (req, res) => {
 
 
 
-//get all products with pagination
+
+// Get all products with pagination and optional filtering by tags
 app.get('/products', async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Current page number
   const limit = parseInt(req.query.limit) || 6; // Items per page
   const skip = (page - 1) * limit; // Items to skip
-  const filter = { status: "approved" };
+  const filter = { status: "approved" }; // Base filter for approved products
 
+  const { tags } = req.query;
+
+  // Add case-insensitive and partial matching for tags if provided
+  if (tags) {
+    const tagsArray = tags.split(',').map((tag) => {
+      return { tags: { $regex: tag.trim(), $options: 'i' } }; // Partial, case-insensitive match
+    });
+    filter.$or = tagsArray; // Match any of the provided tags
+  }
 
   try {
-    const totalProducts = await productsPH.countDocuments(filter); // Total number of products
-    const products = await productsPH.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(); // Fetch paginated products
+    // Count total filtered products
+    const totalProducts = await productsPH.countDocuments(filter);
+
+    // Fetch paginated and sorted products
+    const products = await productsPH
+      .find(filter)
+      .sort({ createdAt: -1 }) // Sort by most recent
+      .skip(skip)
+      .limit(limit)
+      .toArray();
 
     res.status(200).json({
+      success: true,
       products,
       currentPage: page,
       totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching products' });
+    console.error('Error fetching products:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching products',
+    });
   }
 });
+
+
 
 
 
