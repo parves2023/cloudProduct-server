@@ -629,6 +629,84 @@ app.get('/my-products', async (req, res) => {
 
 
 
+// Delete a specific product
+app.delete('/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    const result = await productsPH.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ message: 'Failed to delete product' });
+  }
+});
+
+
+
+
+
+
+
+
+// Update a specific product
+
+app.put('/products/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, category, price, externalLink, tags, image, description } = req.body;
+
+  // Validate ID
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid product ID' });
+  }
+
+  // Construct the updated data
+  const updatedData = {
+    ...(name && { name }),
+    ...(category && { category }),
+    ...(price && { price: parseFloat(price) }), // Ensure price is a number
+    ...(externalLink && { externalLink }),
+    ...(tags && { tags: Array.isArray(tags) ? tags : tags.split(',').map((tag) => tag.trim()) }),
+    ...(image && { image }),
+    ...(description && { description }),
+    updatedAt: new Date(), // Add a timestamp for when the product was updated
+  };
+
+  try {
+    // Update the product in the database
+    const result = await productsPH.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.status(200).json({
+      message: 'Product updated successfully',
+      updatedProduct: { _id: id, ...updatedData },
+    });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Failed to update product', error: error.message });
+  }
+});
+
+
+
+
+
+
 
 // Get all products with pagination and optional filtering by tags
 app.get('/products', async (req, res) => {
