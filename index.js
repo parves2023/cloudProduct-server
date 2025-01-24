@@ -4,6 +4,10 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// console.log("Stripe initialized:", stripe ? "Success" : "Failed");
+
 
 // app.use(
 //   cors({
@@ -39,6 +43,120 @@ async function run() {
     const usersPH = client.db("productHuntDB").collection("users");
     const productsPH = client.db("productHuntDB").collection("products");
     const reviewsPH = client.db("productHuntDB").collection("reviews");
+
+
+
+
+
+
+
+
+
+
+
+     // Route to handle membership status update
+     app.post('/update-membership-status', async (req, res) => {
+      const { email, transactionId } = req.body;
+
+      try {
+          // Update the user's membership status in the MongoDB collection
+          const updateResult = await usersPH.updateOne(
+              { email: email }, // Search by user's email
+              {
+                  $set: { membershipStatus: "verified", transactionId: transactionId }, // Set membership status to "verified"
+              },
+              { upsert: true } // Create the document if it doesn't exist
+          );
+
+          if (updateResult.modifiedCount > 0 || updateResult.upsertedCount > 0) {
+              res.json({ success: true, message: "Membership status updated successfully" });
+          } else {
+              res.json({ success: false, message: "No changes made to the user's status" });
+          }
+      } catch (error) {
+          console.error("Error updating membership status:", error);
+          res.status(500).json({ success: false, message: "Error updating membership status" });
+      }
+  });
+
+
+
+
+
+
+
+
+
+
+
+
+   // Route to check membership status
+   app.post('/check-membership-status', async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        // Find the user by email
+        const user = await usersPH.findOne({ email: email });
+
+        if (user && user.membershipStatus === "verified") {
+            res.json({ success: true, status: "verified" });
+        } else {
+            res.json({ success: true, status: "not_verified" });
+        }
+    } catch (error) {
+        console.error("Error checking membership status:", error);
+        res.status(500).json({ success: false, message: "Error checking membership status" });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const { email, amount } = req.body;
+  
+      try {
+          const paymentIntent = await stripe.paymentIntents.create({
+              amount: amount, // Amount in cents (e.g., 9900 = $99.00)
+              currency: "usd",
+              payment_method_types: ["card"],
+              receipt_email: email,
+          });
+  
+          res.status(200).send({
+              clientSecret: paymentIntent.client_secret, // Ensure this is returned
+          });
+      } catch (error) {
+          console.error("Error creating PaymentIntent:", error);
+          res.status(500).send({ error: "PaymentIntent creation failed" });
+      }
+  });
+  
+  
+
 
 
 
