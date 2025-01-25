@@ -44,6 +44,7 @@ async function run() {
     const usersPH = client.db("productHuntDB").collection("users");
     const productsPH = client.db("productHuntDB").collection("products");
     const reviewsPH = client.db("productHuntDB").collection("reviews");
+    const cuponsPH = client.db("productHuntDB").collection("cupon");
 
 
 
@@ -84,6 +85,33 @@ async function run() {
 
 
 
+
+
+// add cupons
+app.post('/api/coupons', async (req, res) => {
+  const coupon = req.body;
+  const result = await cuponsPH.insertOne(coupon);
+  if (result.acknowledged) {
+    const insertedCoupon = await cuponsPH.findOne({ _id: result.insertedId });
+    res.send(insertedCoupon); // Return the full document
+  } else {
+    res.status(500).send({ error: "Failed to insert coupon" });
+  }
+});
+
+
+//Fetch all coupons
+app.get('/api/coupons', async (req, res) => {
+  const coupons = await cuponsPH.find({}).toArray();
+  res.send(coupons);
+});
+
+//Delete a coupon
+app.delete('/api/coupons/:id', async (req, res) => {
+  const id = req.params.id;
+  const result = await cuponsPH.deleteOne({ _id: new ObjectId(id) });
+  res.send(result);
+});
 
 
 
@@ -143,20 +171,6 @@ async function run() {
         res.status(500).json({ success: false, message: "Error checking membership status" });
     }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -545,23 +559,6 @@ app.get('/api/featured-products', async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Add  products
 app.post("/products", async (req, res) => {
   try {
@@ -653,7 +650,7 @@ app.get('/products/trending', async (req, res) => {
       .limit(limit)
       .toArray();
 
-    console.log(products);
+
 
     res.status(200).json({ success: true, products });
   } catch (error) {
@@ -836,7 +833,7 @@ app.get('/products', async (req, res) => {
 
 
 app.post("/reviews", async (req, res) => {
-  console.log("hitting");
+ 
   
   const { productId, userEmail, userName, rating, review, createdAt, userImg } = req.body;
 
@@ -885,97 +882,6 @@ app.get("/products/:id/reviews", async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch reviews." });
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
