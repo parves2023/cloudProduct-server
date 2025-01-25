@@ -100,6 +100,36 @@ app.post('/api/coupons', async (req, res) => {
 });
 
 
+/// get coupon discount
+app.post('/validate-coupon', async (req, res) => {
+  const { couponCode, amount } = req.body;
+
+  try {
+      // Fetch the coupon from the database
+      const coupon = await cuponsPH.findOne({ code: couponCode });
+
+      if (!coupon) {
+          return res.status(404).json({ success: false, message: "Invalid coupon code" });
+      }
+
+      // Check if the coupon has expired
+      const currentDate = new Date();
+      if (new Date(coupon.expiryDate) < currentDate) {
+          return res.status(400).json({ success: false, message: "Coupon has expired" });
+      }
+
+      // Calculate the discounted amount
+      const discountAmount = (amount * coupon.discount) / 100;
+      const finalAmount = Math.max(amount - discountAmount, 0); // Ensure no negative values
+
+      res.json({ success: true, discountAmount, finalAmount });
+  } catch (error) {
+      console.error('Error validating coupon:', error);
+      res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+
 //Fetch all coupons
 app.get('/api/coupons', async (req, res) => {
   const coupons = await cuponsPH.find({}).toArray();
