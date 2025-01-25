@@ -621,6 +621,21 @@ app.post("/products", async (req, res) => {
 });
 
 
+// Get User Info by Email
+app.get("/checkuserstatus", async (req, res) => {
+  const email = req.query.email;
+  const user = await usersPH.findOne({ email });
+  res.send(user);
+});
+
+//Get Products by User Email:
+app.get("/checkproductslength", async (req, res) => {
+  const email = req.query.email;
+  const userProducts = await productsPH.find({ creatorEmail: email }).toArray();
+  res.send(userProducts);
+});
+
+
 
 // add and remove like
 app.patch('/products/like/:id', async (req, res) => {
