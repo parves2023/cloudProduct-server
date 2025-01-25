@@ -447,6 +447,33 @@ app.patch('/products/:id/delete-report', async (req, res) => {
 
 
 
+/// admin routes
+
+
+// admin statistics page
+app.get("/api/statistics", verifyToken, async (req, res) => {
+  try {
+    const totalUsers = await usersPH.countDocuments();
+    const totalProducts = await productsPH.countDocuments();
+    const acceptedProducts = await productsPH.countDocuments({ status: "approved" });
+    const pendingProducts = await productsPH.countDocuments({ status: "pending" });
+    const totalReviews = await reviewsPH.countDocuments();
+
+    res.send({
+      totalUsers,
+      totalProducts,
+      acceptedProducts,
+      pendingProducts,
+      totalReviews,
+    });
+  } catch (error) {
+    console.error("Error fetching statistics:", error);
+    res.status(500).send({ error: "Failed to fetch statistics" });
+  }
+});
+
+
+
 
 
 
