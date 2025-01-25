@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
@@ -43,6 +44,40 @@ async function run() {
     const usersPH = client.db("productHuntDB").collection("users");
     const productsPH = client.db("productHuntDB").collection("products");
     const reviewsPH = client.db("productHuntDB").collection("reviews");
+
+
+
+
+
+        // jwt related api
+        app.post('/jwt', async (req, res) => {
+          const user = req.body;
+          const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+          res.send({ token });
+        })
+
+
+
+
+ // middlewares 
+ const verifyToken = (req, res, next) => {
+  // console.log('inside verify token', req.headers.authorization);
+  if (!req.headers.authorization) {
+    return res.status(401).send({ message: 'unauthorized access' });
+  }
+  const token = req.headers.authorization.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: 'unauthorized access' })
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
+
+
+
+        
 
 
 
@@ -235,7 +270,7 @@ app.post("/api/check-role", async (req, res) => {
 
 
 // Fetch products by status
-app.get("/api/products", async (req, res) => {
+app.get("/api/products", verifyToken, async (req, res) => {
   const { status } = req.query;
 
   try {
@@ -258,7 +293,7 @@ app.get("/api/products", async (req, res) => {
 
 
 // Update product status (approve or reject)
-app.patch("/api/products/:id", async (req, res) => {
+app.patch("/api/products/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const { status } = req.query;
 
@@ -293,7 +328,7 @@ app.patch("/api/products/:id", async (req, res) => {
 
 
 // Mark or unmark a product as featured
-app.patch('/products/mark-as-featured/:id', async (req, res) => {
+app.patch('/products/mark-as-featured/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const { markAsFeatured } = req.body;
 
@@ -420,12 +455,9 @@ app.patch('/products/:id/delete-report', async (req, res) => {
 
 // Get users grouped by roles with MongoDB queries
 // Get users by role
-app.get("/users", async (req, res) => {
+app.get("/users",verifyToken, async (req, res) => {
   try {
     const { role } = req.query;
-
-    
-
     // Query based on the provided role
     const query = role ? { role } : {};
     const users = await usersPH.find(query).toArray();
@@ -444,7 +476,7 @@ app.get("/users", async (req, res) => {
 
 
 /// change user role
-app.patch("/users/:id", async (req, res) => {
+app.patch("/users/:id",verifyToken, async (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
 
