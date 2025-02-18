@@ -20,7 +20,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 app.use(
   cors({
-    origin: ["https://recidencehotel.netlify.app", "http://localhost:5173" ],
+    origin: ["https://cloudproducts.netlify.app", "http://localhost:5173" ],
     credentials: true,
   })
 );
@@ -75,6 +75,9 @@ async function run() {
     next();
   })
 }
+
+
+
 
 
 
@@ -572,7 +575,7 @@ app.patch("/users/:id",verifyToken, async (req, res) => {
 // Backend route to get featured products
 app.get('/api/featured-products', async (req, res) => {
   try {
-    const products = await productsPH.find({ featured: true }).toArray();
+    const products = await productsPH.find({ markAsFeatured: true }).toArray();
     res.status(200).json(products);
   } catch (error) {
     console.error("Error fetching featured products:", error);
@@ -809,31 +812,77 @@ app.put('/products/:id', async (req, res) => {
 
 
 
-// Get all products with pagination and optional filtering by tags
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Get all products with pagination, filtering by tags, and sorting by price
 app.get('/products', async (req, res) => {
-  const page = parseInt(req.query.page) || 1; // Current page number
-  const limit = parseInt(req.query.limit) || 6; // Items per page
-  const skip = (page - 1) * limit; // Items to skip
-  const filter = { status: "approved" }; // Base filter for approved products
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 6;
+  const skip = (page - 1) * limit;
+  const filter = { status: "approved" };
 
-  const { tags } = req.query;
+  const { tags, sortByPrice } = req.query;
 
-  // Add case-insensitive and partial matching for tags if provided
+  // Add filtering by tags
   if (tags) {
     const tagsArray = tags.split(',').map((tag) => {
-      return { tags: { $regex: tag.trim(), $options: 'i' } }; // Partial, case-insensitive match
+      return { tags: { $regex: tag.trim(), $options: 'i' } };
     });
-    filter.$or = tagsArray; // Match any of the provided tags
+    filter.$or = tagsArray;
   }
 
   try {
     // Count total filtered products
     const totalProducts = await productsPH.countDocuments(filter);
 
+    // Sorting logic
+    let sortOption = { createdAt: -1 }; // Default: Most recent
+    if (sortByPrice) {
+      sortOption = { price: sortByPrice === 'lowToHigh' ? 1 : -1 }; // 1 = Ascending, -1 = Descending
+    }
+
     // Fetch paginated and sorted products
     const products = await productsPH
       .find(filter)
-      .sort({ createdAt: -1 }) // Sort by most recent
+      .sort(sortOption)
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -853,6 +902,7 @@ app.get('/products', async (req, res) => {
     });
   }
 });
+
 
 
 
