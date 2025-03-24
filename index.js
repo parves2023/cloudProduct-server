@@ -6,6 +6,19 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const SSLCommerzPayment = require("sslcommerz-lts");
+const axios = require("axios");
+
+app.use(express.urlencoded({ extended: true })); // Parses form data
+app.use(express.json()); // Parses JSON data
+
+
+
+const store_id = process.env.SSLCOMMERZ_STORE_ID;
+const store_passwd = process.env.SSLCOMMERZ_STORE_PASSWD;
+const is_live = false; // Change to true for production
+
+
 
 // console.log("Stripe initialized:", stripe ? "Success" : "Failed");
 
@@ -17,6 +30,24 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 //     allowedHeaders: ["Content-Type"], // You can add more headers if needed
 //   })
 // );
+
+
+// https://cloudproducts.vercel.app
+// http://localhost:5000
+
+// Store ID: cloud67e1a58b8c5f1
+// Store Password (API/Secret Key): cloud67e1a58b8c5f1@ssl
+
+
+// Merchant Panel URL: https://sandbox.sslcommerz.com/manage/ (Credential as you inputted in the time of registration)
+
+
+ 
+// Store name: testcloudmklm
+// Registered URL: https://cloudproducts.netlify.app/
+// Session API to generate transaction: https://sandbox.sslcommerz.com/gwprocess/v3/api.php
+// Validation API: https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php?wsdl
+// Validation API (Web Service) name: https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php
 
 app.use(
   cors({
@@ -211,31 +242,207 @@ app.delete('/api/coupons/:id', async (req, res) => {
 
 
 
+const BASE_URL = is_live
+  ? "https://securepay.sslcommerz.com"
+  : "https://sandbox.sslcommerz.com";
+
+
+// SSLCommerz payment initiation
+app.post("/initiate-ssl-payment", async (req, res) => {
+  try {
+    const { amount, user } = req.body;
+
+    const data = {
+      store_id,
+      store_passwd,
+      total_amount: amount,
+      currency: "BDT",
+      tran_id: `txn_${Date.now()}`,
+      success_url: `http://localhost:5000/payment-success?email=${user?.email}&redirect=true`, // Add redirect param
+      fail_url: "http://localhost:5000/payment-fail",
+      cancel_url: "http://localhost:5000/payment-cancel",
+      ipn_url: "http://localhost:5000/ipn",
+      cus_name: user.name,
+      cus_email: user.email,
+      cus_add1: "Dhaka",
+      cus_phone: user.phone || "01700000000",
+      shipping_method: "NO",
+      product_name: "Premium Subscription",
+      product_category: "Subscription",
+      product_profile: "general",
+    };
+    
+
+    // Initialize SSLCommerz payment request
+    const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+
+    const response = await sslcz.init(data);
+
+    // If payment initiation is successful, return the payment URL
+    if (response?.GatewayPageURL) {
+      res.json({ url: response.GatewayPageURL });
+    } else {
+      res.status(500).json({ error: "SSLCommerz payment initiation failed", details: response });
+    }
+  } catch (error) {
+    console.error("SSLCommerz Error:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+// SSLCommerz payment success check
+app.post("/payment-success", async (req, res) => {
+  try {
+    const userEmail = req.query.email;
+    const redirect = req.query.redirect === "true"; // Check if redirection is required
+
+    const { val_id, tran_id, amount, currency, status } = req.body;
+
+    if (!val_id || !tran_id || !amount || !currency || status !== "VALID") {
+      console.log("[ERROR] Invalid Payment Data:", req.body);
+      return res.status(400).json({ error: "Payment is not valid or missing required fields" });
+    }
+
+    console.log("[INFO] Received Payment Data:", { val_id, tran_id, amount, currency, status, userEmail });
+
+    const validationURL = `https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php?val_id=${val_id}&store_id=${store_id}&store_passwd=${store_passwd}&format=json`;
+
+    const validationResponse = await axios.get(validationURL);
+    const validationData = validationResponse.data;
+
+    console.log("[INFO] SSLCommerz Validation Response:", validationData);
+
+    if ((validationData?.status === "VALIDATED" || validationData?.status === "VALID") && validationData?.currency === "BDT") {
+      console.log("[INFO] Payment Verified Successfully:", validationData);
+
+      if (!userEmail) {
+        console.error("[ERROR] User email not found in the request.");
+        return res.status(400).json({ error: "User email not found in payment data" });
+      }
+
+      // Update user membership in MongoDB
+      const updateResult = await usersPH.updateOne(
+        { email: userEmail },
+        { 
+          $set: { 
+            membershipStatus: "verified", 
+            transactionId: tran_id 
+          }
+        },
+        { upsert: true }
+      );
+
+      if (updateResult.modifiedCount === 0 && updateResult.upsertedCount === 0) {
+        console.error("[ERROR] Failed to update or insert membership for user:", userEmail);
+        return res.status(500).json({ error: "Failed to update or insert membership" });
+      }
+
+      console.log("[INFO] Membership updated successfully for:", userEmail);
+
+      // ✅ Redirect to frontend if required
+      if (redirect) {
+        return res.redirect(`http://localhost:5173/dashboard/my-profile`);
+      }
+
+      return res.json({ message: "Membership updated successfully!" });
+    } else {
+      console.log("[ERROR] Payment validation failed:", validationData);
+      return res.status(400).json({ error: "Payment validation failed" });
+    }
+  } catch (error) {
+    console.error("[ERROR] Payment validation error:", error);
+    return res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 
    
+// stripe payment system
+app.post("/payment-success", async (req, res) => {
+  try {
+    const { val_id, tran_id, amount, currency, status, user } = req.body;
 
-    app.post("/create-payment-intent", async (req, res) => {
-      const { email, amount } = req.body;
-  
-      try {
-          const paymentIntent = await stripe.paymentIntents.create({
-              amount: amount, // Amount in cents (e.g., 9900 = $99.00)
-              currency: "usd",
-              payment_method_types: ["card"],
-              receipt_email: email,
-          });
-  
-          res.status(200).send({
-              clientSecret: paymentIntent.client_secret, // Ensure this is returned
-          });
-      } catch (error) {
-          console.error("Error creating PaymentIntent:", error);
-          res.status(500).send({ error: "PaymentIntent creation failed" });
+    if (!val_id || !tran_id || !amount || !currency || status !== "VALID") {
+      console.log("[ERROR] Invalid Payment Data:", req.body);
+      return res.status(400).json({ error: "Payment is not valid or missing required fields" });
+    }
+
+    console.log("[INFO] Received Payment Data:", {
+      val_id,
+      tran_id,
+      amount,
+      currency,
+      status,
+      email: user?.email,
+    });
+
+    // Validate the transaction with SSLCommerz API
+    const validationURL = `https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php?val_id=${val_id}&store_id=${store_id}&store_passwd=${store_passwd}&format=json`;
+
+    const validationResponse = await axios.get(validationURL);
+    const validationData = validationResponse.data;
+
+    console.log("[INFO] SSLCommerz Validation Response:", validationData);
+
+    if ((validationData?.status === "VALIDATED" || validationData?.status === "VALID") && validationData?.currency === "BDT") {
+      console.log("[INFO] Payment Verified Successfully:", validationData);
+
+      if (!user?.email) {
+        console.error("[ERROR] User email not found.");
+        return res.status(400).json({ error: "User email not found in payment data" });
       }
-  });
+
+      // **Save to MongoDB like Stripe system**
+      const updateResult = await usersPH.updateOne(
+        { email: user.email },  // Find user by email
+        {
+          $set: {
+            membership: "premium", 
+            transactionId: tran_id,
+          },
+        },
+        { upsert: true } // Insert if not exists
+      );
+
+      if (updateResult.modifiedCount === 0 && updateResult.upsertedCount === 0) {
+        console.error("[ERROR] Failed to update or insert membership for user:", user.email);
+        return res.status(500).json({ error: "Failed to update or insert membership" });
+      }
+
+      console.log("[INFO] Membership updated/inserted successfully for:", user.email);
+      return res.json({ message: "Membership updated successfully!" });
+    } else {
+      console.log("[ERROR] Payment validation failed:", validationData);
+      return res.status(400).json({ error: "Payment validation failed" });
+    }
+  } catch (error) {
+    console.error("[ERROR] Payment validation error:", error);
+    return res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+
+
+  
   
   
 
