@@ -49,6 +49,24 @@ const is_live = false; // Change to true for production
 // Validation API: https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php?wsdl
 // Validation API (Web Service) name: https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php
 
+
+
+
+
+// bkash payment 
+
+// Replace with your actual bKash credentials
+const BKASH_BASE_URL = "https://checkout.sandbox.bka.sh/v1.2.0-beta";
+const BKASH_USERNAME = process.env.BKASH_USERNAME;
+const BKASH_PASSWORD = process.env.BKASH_PASSWORD;
+const BKASH_APP_KEY = process.env.BKASH_APP_KEY;
+const BKASH_APP_SECRET = process.env.BKASH_APP_SECRET;
+
+let bkashToken = null;
+
+
+
+
 app.use(
   cors({
     origin: ["https://cloudproducts.netlify.app", "http://localhost:5173" ],
@@ -235,6 +253,104 @@ app.delete('/api/coupons/:id', async (req, res) => {
         res.status(500).json({ success: false, message: "Error checking membership status" });
     }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 🔹 1️⃣ Generate bKash Token
+const generateBkashToken = async () => {
+  try {
+    const response = await axios.post(`${BKASH_BASE_URL}/checkout/token/grant`, {
+      app_key: BKASH_APP_KEY,
+      app_secret: BKASH_APP_SECRET,
+    }, {
+      headers: { "Content-Type": "application/json" },
+      auth: { username: BKASH_USERNAME, password: BKASH_PASSWORD },
+    });
+
+    bkashToken = response.data.id_token;
+    console.log("🔑 bKash Token Generated:", bkashToken);
+  } catch (error) {
+    console.error("❌ Error generating bKash token:", error.response?.data || error.message);
+  }
+};
+
+// 🔹 2️⃣ Initiate bKash Payment
+app.post("/initiate-bkash-payment", async (req, res) => {
+  const { amount, user } = req.body;
+
+  if (!bkashToken) await generateBkashToken(); // Ensure token is available
+
+  try {
+    const response = await axios.post(`${BKASH_BASE_URL}/checkout/payment/create`, {
+      mode: "0011", // Sandbox mode
+      payerReference: user.email, // Use email as reference
+      callbackURL: "http://localhost:5000/bkash-payment-success",
+      amount: amount.toString(),
+      currency: "BDT",
+      intent: "sale",
+    }, {
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${bkashToken}`,
+        "X-App-Key": BKASH_APP_KEY,
+      },
+    });
+
+    if (response.data.paymentID) {
+      res.json({ url: response.data.bkashURL }); // Redirect user to bKash payment page
+    } else {
+      res.status(400).json({ message: "Failed to initiate bKash payment" });
+    }
+  } catch (error) {
+    console.error("❌ Error initiating bKash payment:", error.response?.data || error.message);
+    res.status(500).json({ message: "bKash payment initiation failed" });
+  }
+});
+
+
+
+
+// 🔹 3️⃣ Handle Payment Success
+app.post("/bkash-payment-success", async (req, res) => {
+  const { paymentID } = req.body;
+
+  try {
+    const response = await axios.post(`${BKASH_BASE_URL}/checkout/payment/execute`, {
+      paymentID,
+    }, {
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${bkashToken}`,
+        "X-App-Key": BKASH_APP_KEY,
+      },
+    });
+
+    if (response.data.transactionStatus === "Completed") {
+      res.json({ success: true, message: "Payment successful" });
+    } else {
+      res.json({ success: false, message: "Payment not completed" });
+    }
+  } catch (error) {
+    console.error("❌ Error executing bKash payment:", error.response?.data || error.message);
+    res.status(500).json({ message: "Payment execution failed" });
+  }
+});
+
+
 
 
 
