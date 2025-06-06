@@ -374,10 +374,10 @@ app.post("/initiate-ssl-payment", async (req, res) => {
       total_amount: amount,
       currency: "BDT",
       tran_id: `txn_${Date.now()}`,
-      success_url: `http://localhost:5000/payment-success?email=${user?.email}&redirect=true`, // Add redirect param
-      fail_url: "http://localhost:5000/payment-fail",
-      cancel_url: "http://localhost:5000/payment-cancel",
-      ipn_url: "http://localhost:5000/ipn",
+      success_url: `https://cloudproducts.vercel.app/payment-success?email=${user?.email}&redirect=true`, // Add redirect param
+      fail_url: "https://cloudproducts.vercel.app/payment-fail",
+      cancel_url: "https://cloudproducts.vercel.app/payment-cancel",
+      ipn_url: "https://cloudproducts.vercel.app/ipn",
       cus_name: user.name,
       cus_email: user.email,
       cus_add1: "Dhaka",
@@ -457,7 +457,7 @@ app.post("/payment-success", async (req, res) => {
 
       // ✅ Redirect to frontend if required
       if (redirect) {
-        return res.redirect(`http://localhost:5173/dashboard/my-profile`);
+        return res.redirect(`https://cloudproducts.netlify.app/dashboard/my-profile`);
       }
 
       return res.json({ message: "Membership updated successfully!" });
